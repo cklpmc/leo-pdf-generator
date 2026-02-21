@@ -11,11 +11,19 @@ export default async function handler(req, res) {
     const data = req.body;
     const html = generateReportHTML(data);
     
-    const browser = await puppeteer.launch({
-      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
+const browser = await puppeteer.launch({
+args: [
+...chromium.args,
+"--hide-scrollbars",
+"--disable-web-security",
+"--no-sandbox",
+"--disable-setuid-sandbox"
+],
+defaultViewport: chromium.defaultViewport,
+executablePath: await chromium.executablePath(),
+headless: chromium.headless,
+ignoreHTTPSErrors: true,
+});
     
     const page = await browser.newPage();
     
