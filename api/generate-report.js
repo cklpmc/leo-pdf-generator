@@ -9,36 +9,35 @@ export default async function handler(req, res) {
   
   try {
     const data = req.body;
-    
-    if (!data || !data.name) {
-      return res.status(400).json({ error: 'Invalid data' });
-    }
-    
     const html = generateReportHTML(data);
     
     const browser = await puppeteer.launch({
-      args: chromium.args,
+      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless
+      headless: chromium.headless,
     });
     
     const page = await browser.newPage();
+    
+    // Set content and wait for the CDN (Chart.js) to load
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.waitForTimeout(2000); // Wait for charts
+    
+    // Use a standard promise-based delay instead of waitForTimeout
+    await new Promise(resolve => setTimeout(resolve, 2000)); 
     
     const pdf = await page.pdf({
       format: 'A4',
-      printBackground: true
+      printBackground: true,
+      margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }
     });
     
     await browser.close();
     
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="report-${data.name}.pdf"`);
     res.send(pdf);
     
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'PDF generation failed' });
+    console.error('Build Error:', error);
+    res.status(500).json({ error: error.message });
   }
 }
