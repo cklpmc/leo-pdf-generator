@@ -1,9 +1,6 @@
 {
-  "name": "leo-pdf-generator",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "puppeteer-core": "21.11.0",
-    "@sparticuz/chromium": "121.0.0"
-  }
+"name": "leo-pdf-generator",
+"version": "1.0.0",
+"type": "module",
+"dependencies": {}
 }
