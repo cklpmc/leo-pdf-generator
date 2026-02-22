@@ -1,5 +1,3 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
 import { generateReportHTML } from '../templates/report-template.js';
 
 export default async function handler(req, res) {
@@ -16,62 +14,43 @@ export default async function handler(req, res) {
     
     const html = generateReportHTML(data);
     
-    // Configure chromium for serverless
-    const browser = await puppeteer.launch({
-      args: [
-        ...chromium.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu'
-      ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless
+    // Call PDF.co API
+    const response = await fetch('https://api.pdf.co/v1/pdf/convert/from/html', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.PDFCO_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        html: html,
+        name: `report-${data.name}.pdf`,
+        margins: '0',
+        paperSize: 'A4',
+        orientation: 'portrait',
+        printBackground: true,
+        mediaType: 'print'
+      })
     });
     
-    const page = await browser.newPage();
+    const result = await response.json();
     
-    await page.setContent(html, { 
-      waitUntil: ['networkidle0', 'load']
-    });
+    if (!result.url) {
+      throw new Error('PDF generation failed');
+    }
     
-    // Wait for Chart.js to render
-    await page.waitForTimeout(2000);
-    
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '0mm',
-        right: '0mm',
-        bottom: '0mm',
-        left: '0mm'
-      }
-    });
-    
-    await browser.close();
+    // Fetch the generated PDF
+    const pdfResponse = await fetch(result.url);
+    const pdfBuffer = await pdfResponse.arrayBuffer();
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="report-${data.name}.pdf"`);
-    return res.send(pdf);
+    return res.send(Buffer.from(pdfBuffer));
     
   } catch (error) {
-    console.error('PDF Error:', error);
+    console.error('Error:', error);
     return res.status(500).json({ 
       error: 'PDF generation failed',
-      message: error.message
+      message: error.message 
     });
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb'
-    }
-  }
-};
