@@ -1,5 +1,4 @@
 export function generateReportHTML(data) {
-  // Safely handle data
   const name = data.name || 'User';
   const reportDate = data.report_date || new Date().toLocaleDateString();
   const period = data.period || 'N/A';
@@ -19,56 +18,128 @@ export function generateReportHTML(data) {
   const winOfWeek = data.win_of_the_week || '';
   const leoAdvice = data.leo_advice || '';
   
-  // Generate error bars HTML
-  const errorBarsHTML = topErrorTags.map((tag, i) => {
+  // Generate simple sparkline SVG (no Chart.js!)
+  const generateSparkline = (values, color, maxValue = 1) => {
+    const width = 600;
+    const height = 100;
+    const points = values.map((val, i) => {
+      const x = (i / (values.length - 1)) * width;
+      const y = height - (val / maxValue) * height;
+      return `${x},${y}`;
+    }).join(' ');
+    
+    return `
+      <svg width="${width}" height="${height}" style="margin: 20px 0;">
+        <polyline
+          points="${points}"
+          fill="none"
+          stroke="${color}"
+          stroke-width="3"
+        />
+      </svg>
+    `;
+  };
+  
+  // Generate error bars
+  const errorBarsHTML = topErrorTags.slice(0, 5).map((tag, i) => {
     const count = topErrorCounts[i] || 0;
     const maxCount = topErrorCounts[0] || 1;
     const width = (count / maxCount) * 100;
     const tagFormatted = tag.replace(/_/g, ' ');
     
     return `
-      <div class="error-bar">
-        <div class="error-label">
+      <div style="margin: 15px 0;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;">
           <span>${tagFormatted}</span>
-          <span><b>${count}</b> errors</span>
+          <span style="font-weight: bold; color: #ef4444;">${count} errors</span>
         </div>
-        <div class="bar-container">
-          <div class="bar-fill" style="width: ${width}%"></div>
+        <div style="height: 24px; background: #f3f4f6; border-radius: 12px; overflow: hidden;">
+          <div style="width: ${width}%; height: 100%; background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); border-radius: 12px;"></div>
         </div>
       </div>
     `;
   }).join('');
   
-  // Generate labels for charts
-  const labels = accStack.map((_, i) => i + 1);
-  
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; }
-    .page { width: 210mm; min-height: 297mm; padding: 20mm; background: white; page-break-after: always; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+      color: #1f2937;
+    }
+    .page { 
+      width: 210mm;
+      min-height: 297mm;
+      padding: 20mm;
+      background: white;
+      page-break-after: always;
+    }
     .page:last-child { page-break-after: auto; }
-    .header { text-align: center; border-bottom: 4px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+    .header { 
+      text-align: center; 
+      border-bottom: 4px solid #2563eb; 
+      padding-bottom: 20px; 
+      margin-bottom: 30px; 
+    }
     .header h1 { font-size: 32px; color: #1e40af; margin-bottom: 8px; }
     .header .subtitle { font-size: 14px; color: #6b7280; }
-    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 30px 0; }
-    .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+    .metrics { 
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      margin: 30px 0;
+    }
+    .metric-card { 
+      flex: 1;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+      color: white; 
+      padding: 20px; 
+      border-radius: 12px; 
+      text-align: center; 
+    }
     .metric-value { font-size: 48px; font-weight: bold; margin: 10px 0; }
     .metric-label { font-size: 14px; opacity: 0.9; text-transform: uppercase; }
-    .leo-comment { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 8px; margin: 20px 0; }
-    .section-title { font-size: 24px; color: #374151; margin: 30px 0 20px; padding-bottom: 10px; border-bottom: 2px solid #e5e7eb; }
-    .chart-container { width: 100%; height: 300px; margin: 20px 0; }
-    .error-bar { margin: 15px 0; }
-    .error-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-    .bar-container { height: 24px; background: #f3f4f6; border-radius: 12px; overflow: hidden; }
-    .bar-fill { height: 100%; background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%); border-radius: 12px; }
-    .win-banner { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #78350f; padding: 30px; border-radius: 16px; text-align: center; margin: 30px 0; font-size: 18px; }
-    .advice-box { background: #eff6ff; border: 2px solid #3b82f6; padding: 25px; border-radius: 12px; margin: 30px 0; }
-    .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+    .comment { 
+      background: #eff6ff; 
+      border-left: 4px solid #3b82f6; 
+      padding: 20px; 
+      border-radius: 8px; 
+      margin: 20px 0; 
+    }
+    .section-title { 
+      font-size: 24px; 
+      color: #374151; 
+      margin: 30px 0 20px; 
+      padding-bottom: 10px; 
+      border-bottom: 2px solid #e5e7eb; 
+    }
+    .win { 
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); 
+      color: #78350f; 
+      padding: 30px; 
+      border-radius: 16px; 
+      text-align: center; 
+      margin: 30px 0; 
+      font-size: 18px; 
+    }
+    .advice { 
+      background: #eff6ff; 
+      border: 2px solid #3b82f6; 
+      padding: 25px; 
+      border-radius: 12px; 
+      margin: 30px 0; 
+    }
+    .footer { 
+      text-align: center; 
+      color: #9ca3af; 
+      font-size: 12px; 
+      margin-top: 40px; 
+      padding-top: 20px; 
+      border-top: 1px solid #e5e7eb; 
+    }
   </style>
 </head>
 <body>
@@ -77,7 +148,8 @@ export function generateReportHTML(data) {
       <h1>Progress Report</h1>
       <div class="subtitle">${name} | ${reportDate} | ${period}</div>
     </div>
-    <div class="metrics-grid">
+    
+    <div class="metrics">
       <div class="metric-card">
         <div class="metric-label">Accuracy</div>
         <div class="metric-value">${accEma}</div>
@@ -91,65 +163,28 @@ export function generateReportHTML(data) {
         <div class="metric-value" style="font-size: 32px;">${userLevel}</div>
       </div>
     </div>
-    <div class="leo-comment">${leoPrimComm}</div>
-    <div class="section-title">Progress Over Time</div>
-    <canvas id="chart1" class="chart-container"></canvas>
+    
+    <div class="comment">${leoPrimComm}</div>
+    
+    <div class="section-title">Accuracy Progress</div>
+    ${generateSparkline(accStack, '#ef4444', 1)}
+    
+    <div class="section-title">Complexity Progress</div>
+    ${generateSparkline(complStack, '#3b82f6', 6)}
   </div>
   
   <div class="page">
     <div class="section-title">Error Analysis</div>
     ${errorBarsHTML}
-    <div class="leo-comment">${leoErrDiag}</div>
-    <canvas id="chart2" class="chart-container"></canvas>
-    <div class="win-banner">${winOfWeek}</div>
-    <div class="advice-box">${leoAdvice}</div>
+    
+    <div class="comment">${leoErrDiag}</div>
+    
+    <div class="win">${winOfWeek}</div>
+    
+    <div class="advice">${leoAdvice}</div>
+    
     <div class="footer">Generated by Leo | ${reportDate}</div>
   </div>
-
-  <script>
-    new Chart(document.getElementById('chart1'), {
-      type: 'line',
-      data: {
-        labels: ${JSON.stringify(labels)},
-        datasets: [{
-          label: 'Accuracy',
-          data: ${JSON.stringify(accStack)},
-          borderColor: '#ef4444',
-          tension: 0.4
-        }, {
-          label: 'Complexity',
-          data: ${JSON.stringify(complStack)},
-          borderColor: '#3b82f6',
-          tension: 0.4,
-          yAxisID: 'y1'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { min: 0, max: 1, position: 'left' },
-          y1: { min: 0, max: 6, position: 'right', grid: { drawOnChartArea: false } }
-        }
-      }
-    });
-    
-    new Chart(document.getElementById('chart2'), {
-      type: 'doughnut',
-      data: {
-        labels: ${JSON.stringify(topErrorTags)},
-        datasets: [{ 
-          data: ${JSON.stringify(topErrorCounts)},
-          backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16']
-        }]
-      },
-      options: { 
-        responsive: true, 
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'right' } }
-      }
-    });
-  </script>
 </body>
 </html>`;
 }
